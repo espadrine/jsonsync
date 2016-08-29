@@ -26,6 +26,10 @@ data.add('/comments/-', "This article was flabberghasting.")
 
 [JSON Patch]: http://jsonpatch.com/
 
+Please note that this is not ready for production. The protocol, in particular,
+is subject to change. On the other hand, for demos and personal projects, go
+right away!
+
 ## Cons
 
 Currently, we do not guarantee intention preservation. Operations are not
@@ -37,6 +41,15 @@ fully loaded on your node. If some JSON objects are too big, you can separate
 them into several JsonSync objects. For instance, if you have a chat app, you
 would have a separate object for each 10k messages, and your app could fetch the
 previous batch if it needs to go further in history.
+
+Currently, you need to keep (and download) the whole history. We will make it
+possible in the future to also support automatic deletion of history that all
+nodes have in common, but if you enable that, it will preclude normal offline
+editing. (You will be able to do offline editing by performing a [JSON diff][]
+when you reconnect, but your operations may be severely
+non-intention-preserving, requiring manual verification.)
+
+[JSON diff]: https://github.com/espadrine/json-diff
 
 ## Integration
 
