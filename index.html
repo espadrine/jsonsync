@@ -1,0 +1,137 @@
+<!doctype html><meta charset=utf-8><title> JsonSync demo </title>
+
+<h1> JsonSync </h1>
+<p>Transport-agnostic operation-rich peer-to-peer JSON synchronization.
+</p>
+
+<h1> Demonstration </h1>
+<p> Here are two JSON editors. We simulate a 2-second latency between the two.
+</p>
+<section id=demos>
+  <div id=demo1></div>
+  <div id=demo2></div>
+</section>
+
+<style>
+#demos { display: flex; }
+#demos > div { width: 50%; }
+#demos ol { margin-top: 0; margin-bottom: 0; padding: 0; }
+</style>
+
+<script src=./jsonsync.js></script>
+<script>
+// JSON editor implemented over DOM.
+var jsonEditor = function(dom, jsonsync) {
+  var json = {}
+  var changeValue = function(event) {
+    event.target.dataset.path
+  }
+  var deleteValue = function(event) {
+    var path = event.target.dataset.path
+    jsonsync.remove(path)
+    json = jsonsync.content
+    showJson(json)
+  }
+  var insertValueToArray = function(event) {
+    var path = event.target.dataset.path
+    var key = prompt("Enter a JSON index wherein to insert a value.")
+    var value = prompt("Enter a JSON value to insert.")
+    try {
+      value = JSON.parse(value)
+    } catch(e) { alert(e); return }
+    jsonsync.add(path + '/' + (+key), value)
+    json = jsonsync.content
+    showJson(json)
+  }
+  var insertValueToObject = function(event) {
+    var path = event.target.dataset.path
+    var key = prompt("Enter a JSON key wherein to insert a value.")
+    var value = prompt("Enter a JSON value to insert.")
+    try {
+      value = JSON.parse(value)
+    } catch(e) { alert(e); return }
+    jsonsync.add(path + '/' + key, value)
+    json = jsonsync.content
+    showJson(json)
+  }
+  var domFromJson = function(json, path) {
+    var div = document.createElement('div')
+    if (json === null || typeof json === 'boolean' || typeof json === 'number'
+        || typeof json === 'string') {
+      var value = document.createElement('div')
+      value.textContent = JSON.stringify(json)
+      value.dataset.path = path
+      value.addEventListener('click', changeValue)
+      value.style.display = 'inline'
+      var button = document.createElement('button')
+      button.textContent = 'delete'
+      button.dataset.path = path
+      button.addEventListener('click', deleteValue)
+      div.appendChild(value)
+      div.appendChild(button)
+    } else if (Object(json) instanceof Array) {
+      div = document.createElement('ol')
+      for (var i = 0; i < json.length; i++) {
+        var subdiv = domFromJson(json[i], path + '/' + i)
+        var li = document.createElement('li')
+        li.appendChild(subdiv)
+        div.appendChild(li)
+      }
+      var insbut = document.createElement('button')
+      insbut.textContent = 'insert'
+      insbut.dataset.path = path
+      insbut.addEventListener('click', insertValueToArray)
+      var delbut = document.createElement('button')
+      delbut.textContent = 'delete'
+      delbut.dataset.path = path
+      delbut.addEventListener('click', deleteValue)
+      div.appendChild(insbut)
+      div.appendChild(delbut)
+    } else {
+      for (var key in json) {
+        var keyDom = document.createElement('div')
+        keyDom.textContent = key + ':'
+        div.appendChild(keyDom)
+        div.appendChild(domFromJson(json[key], path + '/' + key))
+      }
+      var insbut = document.createElement('button')
+      insbut.textContent = 'insert'
+      insbut.dataset.path = path
+      insbut.addEventListener('click', insertValueToObject)
+      var delbut = document.createElement('button')
+      delbut.textContent = 'delete'
+      delbut.dataset.path = path
+      delbut.addEventListener('click', deleteValue)
+      div.appendChild(insbut)
+      div.appendChild(delbut)
+    }
+    div.style.marginLeft = '20px'
+    return div
+  }
+  var showJson = function(json) {
+    dom.innerHTML = ''
+    dom.appendChild(domFromJson(json, ''))
+  }
+  showJson(json)
+  jsonsync.on('update', function() {
+    json = jsonsync.content
+    showJson(json)
+  })
+}
+
+// Simulate a network.
+var jsonsync1 = new JsonSync({value: {}, machine: [0]})
+var jsonsync2 = new JsonSync({value: {}, machine: [1]})
+var slowBroadcastReceiver = function(jsonsync) {
+  return function(diff) {
+    setTimeout(function() { jsonsync.patch(diff) }, 2000)
+  }
+}
+jsonsync1.on('broadcast', slowBroadcastReceiver(jsonsync2))
+jsonsync2.on('broadcast', slowBroadcastReceiver(jsonsync1))
+
+// Set up the editors.
+
+jsonEditor(document.getElementById('demo1'), jsonsync1)
+jsonEditor(document.getElementById('demo2'), jsonsync2)
+</script>
