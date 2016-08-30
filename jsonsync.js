@@ -14,12 +14,25 @@ var browser = !!this.window
 
 // Main constructor.
 // options:
+// - network: object that must have:
+//   - on('connect', function(node))
+//   - on('disconnect', function(node))
+//   - nodes: an array of Nodes
+//   Nodes are objects that must have:
+//   - send(string)
+//   - on('receive', function(string))
 // - machine: list of numbers identifying the current node in the network.
 //   Collisions break your data's convergence guarantees, so beware.
 //   Optional. It defaults to using whatever good source of randomness there is.
 // - value: default JSON value.
 var JsonSync = function(options) {
   options = options || {}
+
+  this.network = options.network
+  this.connectNode = this.connectNode.bind(this)
+  this.protoReceive = this.protoReceive.bind(this)
+  this.network.nodes.forEach(this.connectNode)
+  this.network.on('connect', this.connectNode)
 
   // Local copy of the JSON data.
   // TODO: support direct edits like `data.content.comments.shift()` through
@@ -73,7 +86,7 @@ JsonSync.prototype = {
     var op = { op: 'add', path: pointer, value: value, mark: mark }
     if (oldValue !== undefined) { op.was = oldValue }
     this.history.push(op)
-    this.emit('broadcast', [op])
+    this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
   },
 
@@ -130,7 +143,7 @@ JsonSync.prototype = {
     var op = { op: 'remove', path: pointer, mark: mark }
     if (oldValue !== undefined) { op.was = oldValue }
     this.history.push(op)
-    this.emit('broadcast', [op])
+    this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
   },
 
@@ -252,7 +265,32 @@ JsonSync.prototype = {
     this.emit('update', changes)
   },
 
+  // Network-related actions.
+
+  connectNode: function(node) {
+    node.on('receive', this.protoReceive)
+  },
+  broadcast: function(str) {
+    var networkLen = this.network.nodes.length
+    for (var i = 0; i < networkLen; i++) {
+      this.network.nodes[i].send('' + str)
+    }
+  },
+  protoReceive: function(str) {
+    var json = JSON.parse(str)
+    if (json[0] === 1) {
+      // 1 - Patch. Argument: a list of operations.
+      var diff = json[1]
+      this.patch(diff)
+    }
+  },
+  // diff: list of operations.
+  protoDiff: function(diff) {
+    return JSON.stringify([1, diff])
+  },
+
   // Event emission.
+
   on: function(event, callback) {
     if (typeof callback !== 'function') {
       throw new Error('Non-function callback')

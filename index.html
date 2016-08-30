@@ -120,15 +120,35 @@ var jsonEditor = function(dom, jsonsync) {
 }
 
 // Simulate a network.
-var jsonsync1 = new JsonSync({value: {}, machine: [0]})
-var jsonsync2 = new JsonSync({value: {}, machine: [1]})
-var slowBroadcastReceiver = function(jsonsync) {
-  return function(diff) {
-    setTimeout(function() { jsonsync.patch(diff) }, 2000)
+var networkLatency = function(f) { setTimeout(f, 2000) }
+var channel = function() {
+  var end1 = {receive: function(){}}, end2 = {receive: function(){}}
+  end1.send = function(str) { networkLatency(function(){ end2.receive(str) }) }
+  end1.on = function(evt, listn) { end1[evt] = listn }
+  end2.send = function(str) { networkLatency(function(){ end1.receive(str) }) }
+  end2.on = function(evt, listn) { end2[evt] = listn }
+  return [end1, end2]
+}
+// Each "real" node has its own Network object.
+// The Networks object sets up their interaction.
+var Networks = function() { this.networks = [] }
+Networks.prototype = {
+  addNode: function() {
+    var nodes = this.networks.map(function(network) {
+      var chan = channel()
+      network.nodes.push(chan[0])
+      return chan[1]
+    })
+    var network = {nodes: nodes, on: function(){}}
+    this.networks.push(network)
+    return network
   }
 }
-jsonsync1.on('broadcast', slowBroadcastReceiver(jsonsync2))
-jsonsync2.on('broadcast', slowBroadcastReceiver(jsonsync1))
+var networks = new Networks()
+var network1 = networks.addNode()
+var network2 = networks.addNode()
+var jsonsync1 = new JsonSync({network: network1, value: {}, machine: [0]})
+var jsonsync2 = new JsonSync({network: network2, value: {}, machine: [1]})
 
 // Set up the editors.
 

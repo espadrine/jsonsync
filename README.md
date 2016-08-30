@@ -8,15 +8,16 @@ Derived from the [Canop paper][].
 
 ```js
 var JsonSync = require('jsonsync')
-var data = new JsonSync()
+// network must have network.on('connect', function(node))
+// and network.on('disconnect', function(node)),
+// network.nodes must be an array of Nodes,
+// which have node.send(string), node.on('receive', function(string)).
+var data = new JsonSync({network: network})
 // Showing changes.
 data.on('update', updateView)
-// Sending a change to other nodes.
-data.on('broadcast', diff => network.broadcast(diff))
-// Receiving a change from a different node.
-network.on('update', diff => data.patch(diff))
 // Performing a local change.
 data.add('/comments/-', "This article was flabberghasting.")
+data.remove('/comments/0')
 ```
 
 - Browser and Node.js
