@@ -76,7 +76,7 @@ JsonSync.prototype = {
     } else {
       var path = pathFromJsonPointer(pointer)
     }
-    var oldValue = this.get(path)
+    var oldValue = cloneValue(this.get(path))
 
     // Perform the change locally.
     if (!this.localAdd(path, value)) { return }
@@ -84,7 +84,12 @@ JsonSync.prototype = {
     // Transmit the change.
     var mark = this.newMark()
     var op = { op: 'add', path: pointer, value: value, mark: mark }
-    if (oldValue !== undefined) { op.was = oldValue }
+    // Only add a `was` if it adds something to an object
+    // (which works like a `replace`, unlike array addition).
+    var parentValue = (path.length > 0)? this.get(path.slice(0, -1)): null
+    if ((oldValue !== undefined) && !(Object(parentValue) instanceof Array)) {
+      op.was = oldValue
+    }
     this.history.push(op)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
@@ -94,7 +99,7 @@ JsonSync.prototype = {
   // path: list of keys.
   localAdd: function(path, value) {
     value = cloneValue(value)
-    if (path === "") {
+    if (path.length === 0) {
       this.content = value
       return true
     }
@@ -133,7 +138,7 @@ JsonSync.prototype = {
     } else {
       var path = pathFromJsonPointer(pointer)
     }
-    var oldValue = this.get(path)
+    var oldValue = cloneValue(this.get(path))
 
     // Perform the change locally.
     if (!this.localRemove(path)) { return }
@@ -200,6 +205,7 @@ JsonSync.prototype = {
   },
 
   // Use this when we receive a diff from the network.
+  // diff: list of operations.
   patch: function(diff) {
     diff = cloneValue(diff)
     // The diff is a list of operations, as per JSON Patch, with marks.
@@ -244,12 +250,24 @@ JsonSync.prototype = {
     changes = changes.concat(this.history.slice(previousInsertionPoint))
 
     // Perform the changes locally.
+    this.localPatch(changes)
+
+    this.emit('update', changes)
+  },
+
+  // Perform changes to the local JSON object.
+  // changes: list of operations.
+  localPatch: function(changes) {
     for (var i = 0, changesLen = changes.length; i < changesLen; i++) {
       var op = changes[i]
       if (op.op === 'add') {
         var path = op.path
         if (typeof path === 'string') {
           path = pathFromJsonPointer(op.path)
+        }
+        if (op.was !== undefined) {
+          op.original = cloneValue(op)
+          op.was = cloneValue(this.get(path))
         }
         this.localAdd(path, op.value)
 
@@ -258,11 +276,13 @@ JsonSync.prototype = {
         if (typeof path === 'string') {
           path = pathFromJsonPointer(op.path)
         }
+        if (op.was !== undefined) {
+          op.original = cloneValue(op)
+          op.was = cloneValue(this.get(path))
+        }
         this.localRemove(path)
       }
     }
-
-    this.emit('update', changes)
   },
 
   // Network-related actions.
