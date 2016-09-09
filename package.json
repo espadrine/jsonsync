@@ -4,7 +4,7 @@
   "description": "Transport-agnostic operation-rich peer-to-peer JSON synchronization",
   "main": "jsonsync.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/main.js"
   },
   "repository": {
     "type": "git",
