@@ -357,6 +357,7 @@ var cloneValue = function(v) {
     return cloneObject(v)
   }
 }
+JsonSync.cloneValue = cloneValue
 
 var cloneObject = function(obj) {
   var res = Object.create(null)
