@@ -78,18 +78,19 @@ JsonSync.prototype = {
     }
     var oldValue = cloneValue(this.get(path))
 
+    // Here, a JSON Patch add must be creating a new key.
+    // If the key already exists, it is a replacement.
+    var parentValue = (path.length > 0)? this.get(path.slice(0, -1)): null
+    if ((oldValue !== undefined) && !(Object(parentValue) instanceof Array)) {
+      return this.replace(pointer, value)
+    }
+
     // Perform the change locally.
     if (!this.localAdd(path, value)) { return }
 
     // Transmit the change.
     var mark = this.newMark()
     var op = { op: 'add', path: pointer, value: value, mark: mark }
-    // Only add a `was` if it adds something to an object
-    // (which works like a `replace`, unlike array addition).
-    var parentValue = (path.length > 0)? this.get(path.slice(0, -1)): null
-    if ((oldValue !== undefined) && !(Object(parentValue) instanceof Array)) {
-      op.was = oldValue
-    }
     this.history.push(op)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
@@ -123,6 +124,63 @@ JsonSync.prototype = {
         key = target.length
       }
       target.splice(+key, 0, value)
+    } else {
+      target[key] = value
+    }
+
+    return true
+  },
+
+  replace: function(pointer, value) {
+    // Ensure that this is a JSON Pointer, even if given a list.
+    if (typeof pointer !== 'string') {
+      var path = pointer
+      pointer = jsonPointerFromPath(path)
+    } else {
+      var path = pathFromJsonPointer(pointer)
+    }
+    var oldValue = cloneValue(this.get(path))
+
+    // Perform the change locally.
+    if (!this.localReplace(path, value)) { return }
+
+    // Transmit the change.
+    var mark = this.newMark()
+    var op = { op: 'replace', path: pointer, value: value, was: oldValue,
+      mark: mark }
+    this.history.push(op)
+    this.broadcast(this.protoDiff([op]))
+    this.emit('localUpdate', [op])
+  },
+
+  // true if the operation was valid.
+  // path: list of keys.
+  localReplace: function(path, value) {
+    value = cloneValue(value)
+    if (path.length === 0) {
+      this.content = value
+      return true
+    }
+
+    var target = this.content
+    for (var i = 0; i < path.length - 1; i++) {
+      if (typeof target !== 'object') {
+        console.warn('JsonSync had an add operation on ' +
+          JSON.stringify(path) +
+          ' but it could not find an object or an array at ' +
+          (path[i - 1] || '/'))
+        return false
+      }
+      target = target[path[i]]
+    }
+    var key = path[path.length - 1]
+
+    target = Object(target)
+    if (target instanceof Array) {
+      if (key === '-') {
+        key = target.length
+      }
+      target[+key] = value
     } else {
       target[key] = value
     }
@@ -260,16 +318,18 @@ JsonSync.prototype = {
   localPatch: function(changes) {
     for (var i = 0, changesLen = changes.length; i < changesLen; i++) {
       var op = changes[i]
-      if (op.op === 'add') {
+      if (op.op === 'add' || op.op === 'replace') {
         var path = op.path
         if (typeof path === 'string') {
           path = pathFromJsonPointer(op.path)
         }
-        if (op.was !== undefined) {
-          op.original = cloneValue(op)
-          op.was = cloneValue(this.get(path))
+        if (this.get(path) === undefined) {
+          op.op = 'add'
+          this.localAdd(path, op.value)
+        } else {
+          op.op = 'replace'
+          this.localReplace(path, op.value)
         }
-        this.localAdd(path, op.value)
 
       } else if (op.op === 'remove') {
         var path = op.path
@@ -348,7 +408,7 @@ var invertOperation = function(op) {
 }
 
 var cloneValue = function(v) {
-  if (v === null || typeof v === 'boolean' || typeof v === 'number'
+  if (v == null || typeof v === 'boolean' || typeof v === 'number'
       || typeof v === 'string') {
     return v
   } else if (Object(v) instanceof Array) {

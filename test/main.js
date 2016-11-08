@@ -54,3 +54,10 @@ networks.flush(0, 1)
 networks.flush(1, 0)
 assert.equal(node[0].content.concurrent, undefined,
   'Concurrent two-way removal')
+
+node[0].add('/hello', 'world')
+networks.flush(0, 1)
+node[1].replace('/hello', 'there')
+networks.flush(1, 0)
+assert.equal(node[0].content.hello, 'there',
+  'One-way transmission of object replacement')
