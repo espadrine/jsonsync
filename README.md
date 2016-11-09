@@ -70,3 +70,6 @@ non-intention-preserving, requiring manual verification.)
 - `arithmetic`: (planned) supports performing operations on numbers. For
   instance, `{op: "arithmetic", path: "/score", value: "max(2*x^2, y)",
   var: {y: "/minScore"}`.
+
+**Warning**: the use of the `add` operation on objects is strictly meant for the
+addition of a brand new key. Use `replace` to update the value of a key.
