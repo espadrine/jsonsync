@@ -125,7 +125,11 @@ JsonSync.prototype = {
       }
       target.splice(+key, 0, value)
     } else {
-      target[key] = value
+      // We must not let an addition perform a key replacement.
+      // However, that is a valid operation.
+      if (target[key] === undefined) {
+        target[key] = value
+      }
     }
 
     return true
@@ -182,7 +186,11 @@ JsonSync.prototype = {
       }
       target[+key] = value
     } else {
-      target[key] = value
+      // We must not let a replacement perform a key addition.
+      // However, that is a valid operation.
+      if (target[key] !== undefined) {
+        target[key] = value
+      }
     }
 
     return true
@@ -318,24 +326,15 @@ JsonSync.prototype = {
   localPatch: function(changes) {
     for (var i = 0, changesLen = changes.length; i < changesLen; i++) {
       var op = changes[i]
-      if (op.op === 'add' || op.op === 'replace') {
-        var path = op.path
-        if (typeof path === 'string') {
-          path = pathFromJsonPointer(op.path)
-        }
-        if (this.get(path) === undefined) {
-          op.op = 'add'
-          this.localAdd(path, op.value)
-        } else {
-          op.op = 'replace'
-          this.localReplace(path, op.value)
-        }
-
+      var path = op.path
+      if (typeof path === 'string') {
+        path = pathFromJsonPointer(path)
+      }
+      if (op.op === 'add') {
+        this.localAdd(path, op.value)
+      } else if (op.op === 'replace') {
+        this.localReplace(path, op.value)
       } else if (op.op === 'remove') {
-        var path = op.path
-        if (typeof path === 'string') {
-          path = pathFromJsonPointer(op.path)
-        }
         if (op.was !== undefined) {
           op.original = cloneValue(op)
           op.was = cloneValue(this.get(path))

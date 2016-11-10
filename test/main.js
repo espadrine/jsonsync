@@ -45,7 +45,7 @@ node[0].add('/concurrent', 'update')
 node[1].add('/concurrent', 'change')
 networks.flush(0, 1)
 networks.flush(1, 0)
-assert.equal(node[0].content.concurrent, 'change',
+assert.equal(node[1].content.concurrent, 'update',
   'Concurrent two-way addition')
 
 node[0].remove('/concurrent')
@@ -61,3 +61,12 @@ node[1].replace('/hello', 'there')
 networks.flush(1, 0)
 assert.equal(node[0].content.hello, 'there',
   'One-way transmission of object replacement')
+node[0].remove('/hello')
+networks.flush(0, 1)
+
+node[0].add('/hello', 'world')
+node[0].localAdd(['hello'], 'there')
+assert.equal(node[0].content.hello, 'world',
+  "Adding existing keys don't perform a replacement")
+node[0].remove('/hello')
+networks.flush(0, 1)
