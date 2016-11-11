@@ -101,7 +101,10 @@ JsonSync.prototype = {
   localAdd: function(path, value) {
     value = cloneValue(value)
     if (path.length === 0) {
-      this.content = value
+      // We must not let an addition perform a replacement.
+      if (this.content === undefined) {
+        this.content = value
+      }
       return true
     }
 
@@ -162,7 +165,10 @@ JsonSync.prototype = {
   localReplace: function(path, value) {
     value = cloneValue(value)
     if (path.length === 0) {
-      this.content = value
+      // We must not let a replacement perform an addition.
+      if (this.content !== undefined) {
+        this.content = value
+      }
       return true
     }
 

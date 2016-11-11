@@ -68,5 +68,17 @@ node[0].add('/hello', 'world')
 node[0].localAdd(['hello'], 'there')
 assert.equal(node[0].content.hello, 'world',
   "Adding existing keys don't perform a replacement")
+node[0].localAdd([], 'world')
+assert.notStrictEqual(node[0].content, 'world',
+  "Adding the root when it exists doesn't perform a replacement")
 node[0].remove('/hello')
 networks.flush(0, 1)
+
+node[0].localReplace(['hello'], 'world')
+assert.equal(node[0].content.hello, undefined,
+  "Replacing an inexistent key doesn't perform an addition")
+node[0].content = undefined
+node[0].localReplace([], 'world')
+assert.equal(node[0].content, undefined,
+  "Replacing the root when it doesn't exist doesn't perform a replacement")
+node[0].content = {}
