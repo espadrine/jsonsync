@@ -26,10 +26,7 @@ function setup(n, value) {
   }
 }
 
-var situation = setup(2, {})
-var networks = situation.networks
-var network = situation.network
-var node = situation.node
+var {network, networks, node} = setup(2, {})
 
 node[0].add('/hello', 'world')
 networks.flush(0, 1)
@@ -82,3 +79,12 @@ node[0].localReplace([], 'world')
 assert.equal(node[0].content, undefined,
   "Replacing the root when it doesn't exist doesn't perform a replacement")
 node[0].content = {}
+
+node[0].add('', {hello: {dear: 'world'}, hi: {my: 'dear'}})
+networks.flush(0, 1)
+node[0].move('/hello', '/hi/there')
+node[1].move('/hi', '/hello/howdy')
+networks.flush(0, 1)
+networks.flush(1, 0)
+assert.equal(node[1].content.hi.there.dear, 'world',
+  "Simultaneous copying")

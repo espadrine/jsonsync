@@ -67,7 +67,10 @@ JsonSync.prototype = {
   },
 
   // Operations.
+  // Adding an operation requires adding the localOperation and modifying
+  // localPatch and invertOperation.
 
+  // {op:'add', path, was}
   add: function(pointer, value) {
     // Ensure that this is a JSON Pointer, even if given a list.
     if (typeof pointer !== 'string') {
@@ -96,7 +99,7 @@ JsonSync.prototype = {
     this.emit('localUpdate', [op])
   },
 
-  // true if the operation was valid.
+  // true if the operation changed the content.
   // path: list of keys.
   localAdd: function(path, value) {
     value = cloneValue(value)
@@ -108,17 +111,8 @@ JsonSync.prototype = {
       return true
     }
 
-    var target = this.content
-    for (var i = 0; i < path.length - 1; i++) {
-      if (typeof target !== 'object') {
-        console.warn('JsonSync had an add operation on ' +
-          JSON.stringify(path) +
-          ' but it could not find an object or an array at ' +
-          (path[i - 1] || '/'))
-        return false
-      }
-      target = target[path[i]]
-    }
+    var target = this.getPath(path.slice(0, -1))
+    if (target === undefined) { return false }
     var key = path[path.length - 1]
 
     target = Object(target)
@@ -138,6 +132,7 @@ JsonSync.prototype = {
     return true
   },
 
+  // {op:'replace', path, value, was}
   replace: function(pointer, value) {
     // Ensure that this is a JSON Pointer, even if given a list.
     if (typeof pointer !== 'string') {
@@ -160,7 +155,7 @@ JsonSync.prototype = {
     this.emit('localUpdate', [op])
   },
 
-  // true if the operation was valid.
+  // true if the operation changed the content.
   // path: list of keys.
   localReplace: function(path, value) {
     value = cloneValue(value)
@@ -172,17 +167,8 @@ JsonSync.prototype = {
       return true
     }
 
-    var target = this.content
-    for (var i = 0; i < path.length - 1; i++) {
-      if (typeof target !== 'object') {
-        console.warn('JsonSync had an add operation on ' +
-          JSON.stringify(path) +
-          ' but it could not find an object or an array at ' +
-          (path[i - 1] || '/'))
-        return false
-      }
-      target = target[path[i]]
-    }
+    var target = this.getPath(path.slice(0, -1))
+    if (target === undefined) { return false }
     var key = path[path.length - 1]
 
     target = Object(target)
@@ -202,6 +188,7 @@ JsonSync.prototype = {
     return true
   },
 
+  // {op:'remove', path, was}
   remove: function(pointer) {
     // Ensure that this is a JSON Pointer, even if given a list.
     if (typeof pointer !== 'string') {
@@ -224,7 +211,7 @@ JsonSync.prototype = {
     this.emit('localUpdate', [op])
   },
 
-  // true if the operation was valid.
+  // true if the operation changed the content.
   // path: list of keys.
   localRemove: function(path) {
     if (path.length === 0) {
@@ -232,17 +219,8 @@ JsonSync.prototype = {
       return true
     }
 
-    var target = this.content
-    for (var i = 0; i < path.length - 1; i++) {
-      if (typeof target !== 'object') {
-        console.warn('JsonSync had a remove operation on ' +
-          JSON.stringify(path) +
-          ' but it could not find an object or an array at ' +
-          (path[i - 1] || '/'))
-        return false
-      }
-      target = target[path[i]]
-    }
+    var target = this.getPath(path.slice(0, -1))
+    if (target === undefined) { return false }
     var key = path[path.length - 1]
 
     target = Object(target)
@@ -258,6 +236,48 @@ JsonSync.prototype = {
     return true
   },
 
+  // {op:'move', from, path}
+  move: function(fromPointer, pointer) {
+    // Ensure that this is a JSON Pointer, even if given a list.
+    if (typeof fromPointer !== 'string') {
+      var fromPath = fromPointer
+      fromPointer = jsonPointerFromPath(path)
+    } else {
+      var fromPath = pathFromJsonPointer(fromPointer)
+    }
+    if (typeof pointer !== 'string') {
+      var path = pointer
+      pointer = jsonPointerFromPath(path)
+    } else {
+      var path = pathFromJsonPointer(pointer)
+    }
+    // FIXME: when we have compound operations, convert an overriding move to a
+    // remove followed by a move.
+
+    if (!this.localMove(fromPath, path)) { return }
+
+    // Transmit the change.
+    var mark = this.newMark()
+    var op = { op: 'move', from: fromPointer, path: pointer, mark: mark }
+    this.history.push(op)
+    this.broadcast(this.protoDiff([op]))
+    this.emit('localUpdate', [op])
+  },
+
+  // true if the operation changed the content.
+  // path: list of keys.
+  localMove: function(fromPath, path) {
+    var target = this.getPath(fromPath)
+    if (target === undefined) { return false }
+    // TODO: preclude prefixes between fromPath and path.
+    if (!this.localAdd(path, cloneValue(target))) { return false }
+    if (!this.localRemove(fromPath)) {
+      this.localRemove(path)
+      return false
+    }
+    return true
+  },
+
   // Give the JSON object corresponding to that JSON Pointer (or path).
   get: function(pointer) {
     // Ensure that this is a JSON Pointer, even if given a list.
@@ -267,7 +287,10 @@ JsonSync.prototype = {
     } else {
       var path = pathFromJsonPointer(pointer)
     }
-
+    return this.getPath(path)
+  },
+  // Give the JSON object corresponding to that path (eg, ['key', 0]).
+  getPath: function(path) {
     var target = this.content
     for (var i = 0; i < path.length; i++) {
       if (typeof target !== 'object') { return }
@@ -346,6 +369,11 @@ JsonSync.prototype = {
           op.was = cloneValue(this.get(path))
         }
         this.localRemove(path)
+      } else if (op.op === 'move') {
+        if (typeof op.from === 'string') {
+          var fromPath = pathFromJsonPointer(op.from)
+        }
+        this.localMove(fromPath, path)
       }
     }
   },
@@ -409,6 +437,10 @@ var invertOperation = function(op) {
     return { op: 'remove', path: op.path, was: op.value }
   } else if (op.op === 'remove') {
     return { op: 'add', path: op.path, value: op.was }
+  } else if (op.op === 'replace') {
+    return { op: 'replace', path: op.path, value: op.was, was: op.value }
+  } else if (op.op === 'move') {
+    return { op: 'move', from: op.path, path: op.from }
   }
 }
 

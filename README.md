@@ -31,6 +31,13 @@ Please note that this is not ready for production. The protocol, in particular,
 is subject to change. On the other hand, for demos and personal projects, go
 right away!
 
+## API
+
+- `.add(path, value)`
+- `.remove(path)`
+- `.replace(path, value)`
+- `.move(fromPath, toPath)`
+
 ## Cons
 
 Currently, we do not guarantee intention preservation. Operations are not
@@ -71,5 +78,16 @@ non-intention-preserving, requiring manual verification.)
   instance, `{op: "arithmetic", path: "/score", value: "max(2*x^2, y)",
   var: {y: "/minScore"}`.
 
-**Warning**: the use of the `add` operation on objects is strictly meant for the
-addition of a brand new key. Use `replace` to update the value of a key.
+**Warnings**: (mostly designed to ensure operational reversibility)
+
+1. The use of the `add` operation on objects is strictly meant for the
+   addition of a brand new key. JSON operations that perform an add on an object
+   where the key already exists perform no modification. Use `replace` to update
+   the value of a key.
+2. The `copy` and `move` operations must not have `path` be a proper prefix of
+   the `from` location; ie., a location cannot be moved nor copied to one of its
+   ancestors. Similarly, they must not have `from` be a proper prefix of the
+   `path` location. (For move operations, the latter
+   [is already enforced][rfc6902 move] by the JSON Patch specification.)
+
+[rfc6902 move]: https://tools.ietf.org/html/rfc6902#section-4.4
