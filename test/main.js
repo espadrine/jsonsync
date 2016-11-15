@@ -83,11 +83,21 @@ assert.equal(node[0].content, undefined,
   "Replacing the root when it doesn't exist doesn't perform a replacement")
 
 ;({network, networks, node} = setup(2, {}))
-node[0].add('', {hello: {dear: 'world'}, hi: {my: 'dear'}})
+node[0].replace('', {hello: {dear: 'world'}, hi: {my: 'dear'}})
 networks.flush(0, 1)
 node[0].move('/hello', '/hi/there')
 node[1].move('/hi', '/hello/howdy')
 networks.flush(0, 1)
 networks.flush(1, 0)
 assert.equal(node[1].content.hi.there.dear, 'world',
-  "Simultaneous copying")
+  "Simultaneous moving")
+
+;({network, networks, node} = setup(2, {}))
+node[0].replace('', {hello: {}, hi: {my: 'dear'}})
+networks.flush(0, 1)
+node[0].move('', '/hello/world')
+node[1].move('/hi', '')
+networks.flush(0, 1)
+networks.flush(1, 0)
+assert.equal(node[1].content.hi.my, 'dear',
+  "Moving to a subtree or to an ancestor should fail")

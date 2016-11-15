@@ -269,7 +269,13 @@ JsonSync.prototype = {
   localMove: function(fromPath, path) {
     var target = this.getPath(fromPath)
     if (target === undefined) { return false }
-    // TODO: preclude prefixes between fromPath and path.
+    // Preclude prefixes between fromPath and path.
+    // This ensures that the target path exists when we move stuff to it,
+    // and that the operation can be reversed.
+    if (isPathPrefix(fromPath, path) || isPathPrefix(path, fromPath)) {
+      return false
+    }
+
     if (!this.localAdd(path, cloneValue(target))) { return false }
     if (!this.localRemove(fromPath)) {
       this.localRemove(path)
@@ -491,6 +497,20 @@ var jsonPointerFromPath = function(path) {
     // to avoid converting `/` to `~01`.
     return part.replace(/~/g, '~0').replace(/\//g, '~1')
   }).join('/')
+}
+
+// True if p1 is a prefix of p2.
+// eg, ['foo'] is a prefix of ['foo', 'bar'].
+function isPathPrefix(p1, p2) {
+  var p1Len = p1.length
+  var p2Len = p2.length
+  // [] is not a prefix of [], ['foo'] isn't a prefix of ['foo'],
+  // and obviously ['foo'] isn't a prefix of [].
+  if (p1Len >= p2Len) { return false }
+  for (var i = 0; i < p1Len; i++) {
+    if (p1[i] !== p2[i]) { return false }
+  }
+  return true
 }
 
 // Mark is a list. Return the alphabetically-ordered lesser one:

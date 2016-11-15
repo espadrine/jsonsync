@@ -89,5 +89,6 @@ non-intention-preserving, requiring manual verification.)
    ancestors. Similarly, they must not have `from` be a proper prefix of the
    `path` location. (For move operations, the latter
    [is already enforced][rfc6902 move] by the JSON Patch specification.)
+   Finally, they must never overwrite a value.
 
 [rfc6902 move]: https://tools.ietf.org/html/rfc6902#section-4.4
