@@ -105,9 +105,8 @@ JsonSync.prototype = {
     value = cloneValue(value)
     if (path.length === 0) {
       // We must not let an addition perform a replacement.
-      if (this.content === undefined) {
-        this.content = value
-      }
+      if (this.content !== undefined) { return false }
+      this.content = value
       return true
     }
 
@@ -124,9 +123,8 @@ JsonSync.prototype = {
     } else {
       // We must not let an addition perform a key replacement.
       // However, that is a valid operation.
-      if (target[key] === undefined) {
-        target[key] = value
-      }
+      if (target[key] !== undefined) { return false }
+      target[key] = value
     }
 
     return true
@@ -142,6 +140,12 @@ JsonSync.prototype = {
       var path = pathFromJsonPointer(pointer)
     }
     var oldValue = cloneValue(this.get(path))
+
+    // Here, a JSON Patch replace must be replacing an existing key.
+    // If the key does not exist, it is an add.
+    if ((oldValue === undefined) && !(Object(parentValue) instanceof Array)) {
+      return this.add(pointer, value)
+    }
 
     // Perform the change locally.
     if (!this.localReplace(path, value)) { return }
@@ -161,9 +165,8 @@ JsonSync.prototype = {
     value = cloneValue(value)
     if (path.length === 0) {
       // We must not let a replacement perform an addition.
-      if (this.content !== undefined) {
-        this.content = value
-      }
+      if (this.content === undefined) { return false }
+      this.content = value
       return true
     }
 
@@ -180,9 +183,8 @@ JsonSync.prototype = {
     } else {
       // We must not let a replacement perform a key addition.
       // However, that is a valid operation.
-      if (target[key] !== undefined) {
-        target[key] = value
-      }
+      if (target[key] === undefined) { return false }
+      target[key] = value
     }
 
     return true
