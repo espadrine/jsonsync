@@ -101,3 +101,12 @@ networks.flush(0, 1)
 networks.flush(1, 0)
 assert.equal(node[1].content.hi.my, 'dear',
   "Moving to a subtree or to an ancestor should fail")
+
+;({network, networks, node} = setup(2, {}))
+var op = node[0].add('/hello', 'world')
+networks.flush(0, 1)
+node[1].replace('/hello', 'there')
+networks.flush(1, 0)
+node[0].replace('/hello', 'after', {after: op})
+assert.equal(node[0].content.hello, 'there',
+  "Atomic compound operations don't allow concurrent operations within them")

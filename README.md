@@ -38,6 +38,15 @@ right away!
 - `.replace(path, value)`
 - `.move(fromPath, toPath)`
 
+To perform an atomic compound operation (ie, a sequence of operations that must
+happen in that order with no concurrent operation inserted within them):
+
+```js
+var value = data.get(origin)
+var op = data.remove(origin)
+data.replace(target, value, {after: op})
+```
+
 ## Cons
 
 Currently, we do not guarantee intention preservation. Operations are not

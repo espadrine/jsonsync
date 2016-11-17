@@ -53,9 +53,14 @@ var JsonSync = function(options) {
 }
 
 JsonSync.prototype = {
-  newMark: function() {
-    var mark = [this.timestamp].concat(this.machine).concat([0])
-    this.timestamp++
+  newMark: function(after) {
+    if (after !== undefined) {
+      var mark = after.mark.slice()
+      mark[mark.length - 1]++
+    } else {
+      var mark = [this.timestamp].concat(this.machine).concat([0])
+      this.timestamp++
+    }
     return mark
   },
 
@@ -71,7 +76,8 @@ JsonSync.prototype = {
   // localPatch and invertOperation.
 
   // {op:'add', path, was}
-  add: function(pointer, value) {
+  add: function(pointer, value, options) {
+    options = options || {}
     // Ensure that this is a JSON Pointer, even if given a list.
     if (typeof pointer !== 'string') {
       var path = pointer
@@ -92,11 +98,11 @@ JsonSync.prototype = {
     if (!this.localAdd(path, value)) { return }
 
     // Transmit the change.
-    var mark = this.newMark()
-    var op = { op: 'add', path: pointer, value: value, mark: mark }
-    this.history.push(op)
+    var op = { op: 'add', path: pointer, value: value }
+    this.insertOpInHistory(op, options)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
+    return op
   },
 
   // true if the operation changed the content.
@@ -131,7 +137,8 @@ JsonSync.prototype = {
   },
 
   // {op:'replace', path, value, was}
-  replace: function(pointer, value) {
+  replace: function(pointer, value, options) {
+    options = options || {}
     // Ensure that this is a JSON Pointer, even if given a list.
     if (typeof pointer !== 'string') {
       var path = pointer
@@ -151,12 +158,11 @@ JsonSync.prototype = {
     if (!this.localReplace(path, value)) { return }
 
     // Transmit the change.
-    var mark = this.newMark()
-    var op = { op: 'replace', path: pointer, value: value, was: oldValue,
-      mark: mark }
-    this.history.push(op)
+    var op = { op: 'replace', path: pointer, value: value, was: oldValue }
+    this.insertOpInHistory(op, options)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
+    return op
   },
 
   // true if the operation changed the content.
@@ -191,7 +197,8 @@ JsonSync.prototype = {
   },
 
   // {op:'remove', path, was}
-  remove: function(pointer) {
+  remove: function(pointer, options) {
+    options = options || {}
     // Ensure that this is a JSON Pointer, even if given a list.
     if (typeof pointer !== 'string') {
       var path = pointer
@@ -205,12 +212,12 @@ JsonSync.prototype = {
     if (!this.localRemove(path)) { return }
 
     // Transmit the change.
-    var mark = this.newMark()
-    var op = { op: 'remove', path: pointer, mark: mark }
+    var op = { op: 'remove', path: pointer }
     if (oldValue !== undefined) { op.was = oldValue }
-    this.history.push(op)
+    this.insertOpInHistory(op, options)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
+    return op
   },
 
   // true if the operation changed the content.
@@ -239,7 +246,8 @@ JsonSync.prototype = {
   },
 
   // {op:'move', from, path}
-  move: function(fromPointer, pointer) {
+  move: function(fromPointer, pointer, options) {
+    options = options || {}
     // Ensure that this is a JSON Pointer, even if given a list.
     if (typeof fromPointer !== 'string') {
       var fromPath = fromPointer
@@ -259,11 +267,11 @@ JsonSync.prototype = {
     if (!this.localMove(fromPath, path)) { return }
 
     // Transmit the change.
-    var mark = this.newMark()
-    var op = { op: 'move', from: fromPointer, path: pointer, mark: mark }
-    this.history.push(op)
+    var op = { op: 'move', from: fromPointer, path: pointer }
+    this.insertOpInHistory(op, options)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
+    return op
   },
 
   // true if the operation changed the content.
@@ -307,10 +315,26 @@ JsonSync.prototype = {
     return target
   },
 
+  // Add a mark to op and insert it into the history.
+  // op: operation, options: {after?}
+  insertOpInHistory: function(op, options) {
+    op.mark = this.newMark(options.after)
+    if (options.after !== undefined) {
+      this.applyPatch([op])
+    } else {
+      this.history.push(op)
+    }
+  },
+
   // Use this when we receive a diff from the network.
   // diff: list of operations.
   patch: function(diff) {
     diff = cloneValue(diff)
+    var changes = this.applyPatch(diff)
+
+    this.emit('update', changes)
+  },
+  applyPatch: function(diff) {
     // The diff is a list of operations, as per JSON Patch, with marks.
     // We assume that within a diff, marks are correctly ordered.
     // changes are a list of changes that will be sent to the view.
@@ -354,8 +378,7 @@ JsonSync.prototype = {
 
     // Perform the changes locally.
     this.localPatch(changes)
-
-    this.emit('update', changes)
+    return changes
   },
 
   // Perform changes to the local JSON object.
