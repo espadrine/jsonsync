@@ -43,8 +43,8 @@ happen in that order with no concurrent operation inserted within them):
 
 ```js
 var value = data.get(origin)
-var op = data.remove(origin)
-data.replace(target, value, {after: op})
+var op = data.remove(origin)             // First operation
+data.replace(target, value, {after: op}) // Second operation
 ```
 
 ## Cons
