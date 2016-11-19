@@ -110,3 +110,19 @@ networks.flush(1, 0)
 node[0].replace('/hello', 'after', {after: op})
 assert.equal(node[0].content.hello, 'there',
   "Atomic compound operations don't allow concurrent operations within them")
+
+;({network, networks, node} = setup(2, {}))
+node[0].replace('', {hello: 'world'})
+networks.flush(0, 1)
+node[0].add('/hello/0', 'hello ')
+node[1].add('/hello/-', '!')
+networks.flush(0, 1)
+networks.flush(1, 0)
+assert.equal(node[0].content.hello, 'hello world!',
+  "Concurrent string addition")
+
+;({network, networks, node} = setup(2, {}))
+node[0].replace('', 'world')
+node[0].add('/0', 'hello ')
+assert.equal(node[0].content, 'hello world',
+  "Root string addition")

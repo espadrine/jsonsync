@@ -90,7 +90,9 @@ JsonSync.prototype = {
     // Here, a JSON Patch add must be creating a new key.
     // If the key already exists, it is a replacement.
     var parentValue = (path.length > 0)? this.get(path.slice(0, -1)): null
-    if ((oldValue !== undefined) && !(Object(parentValue) instanceof Array)) {
+    var parent = Object(parentValue)
+    if ((oldValue !== undefined) && (parentValue !== null) &&
+        !(parent instanceof Array)) {
       return this.replace(pointer, value)
     }
 
@@ -126,6 +128,20 @@ JsonSync.prototype = {
         key = target.length
       }
       target.splice(+key, 0, value)
+    } else if (target instanceof String) {
+      if (key === '-') {
+        key = target.length
+      }
+      key = +key
+      target = target.slice(0, key) + String(value) + target.slice(key)
+      var parentKey = path[path.length - 2]
+      if (parentKey === undefined) {
+        // The string is the root element.
+        this.content = target
+      } else {
+        var targetParent = this.getPath(path.slice(0, -2))
+        targetParent[parentKey] = target
+      }
     } else {
       // We must not let an addition perform a key replacement.
       // However, that is a valid operation.
