@@ -126,3 +126,13 @@ node[0].replace('', 'world')
 node[0].add('/0', 'hello ')
 assert.equal(node[0].content, 'hello world',
   "Root string addition")
+
+;({network, networks, node} = setup(2, {}))
+node[0].replace('', {hello: 'world'})
+networks.flush(0, 1)
+node[1].add('/hello/0', 'go')
+node[0].remove('/hello/0', 3)
+networks.flush(0, 1)
+networks.flush(1, 0)
+assert.equal(node[0].content.hello, 'gold',
+  "Concurrent string removal and addition")

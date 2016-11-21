@@ -127,12 +127,16 @@ JsonSync.prototype = {
       if (key === '-') {
         key = target.length
       }
-      target.splice(+key, 0, value)
+      key = +key
+      if (key !== key) { return false }
+      target.splice(key, 0, value)
     } else if (target instanceof String) {
       if (key === '-') {
         key = target.length
       }
       key = +key
+      key = +key
+      if (key !== key) { return false }
       target = target.slice(0, key) + String(value) + target.slice(key)
       var parentKey = path[path.length - 2]
       if (parentKey === undefined) {
@@ -201,7 +205,9 @@ JsonSync.prototype = {
       if (key === '-') {
         key = target.length
       }
-      target[+key] = value
+      key = +key
+      if (key !== key) { return false }
+      target[key] = value
     } else {
       // We must not let a replacement perform a key addition.
       // However, that is a valid operation.
@@ -213,7 +219,16 @@ JsonSync.prototype = {
   },
 
   // {op:'remove', path, was}
-  remove: function(pointer, options) {
+  remove: function(pointer, count, options) {
+    if (count === undefined) {
+      count = 0
+    } else if (count !== undefined) {
+      if (typeof count === 'object') {
+        options = count
+        count = 0
+      } else if (typeof count !== 'number') { return
+      } else { count = +count }
+    }
     options = options || {}
     // Ensure that this is a JSON Pointer, even if given a list.
     if (typeof pointer !== 'string') {
@@ -225,7 +240,7 @@ JsonSync.prototype = {
     var oldValue = cloneValue(this.get(path))
 
     // Perform the change locally.
-    if (!this.localRemove(path)) { return }
+    if (!this.localRemove(path, count)) { return }
 
     // Transmit the change.
     var op = { op: 'remove', path: pointer }
@@ -238,7 +253,9 @@ JsonSync.prototype = {
 
   // true if the operation changed the content.
   // path: list of keys.
-  localRemove: function(path) {
+  // count: number of items to delete.
+  localRemove: function(path, count) {
+    if (!(count >= 0)) { return false }
     if (path.length === 0) {
       this.content = null
       return true
@@ -253,7 +270,24 @@ JsonSync.prototype = {
       if (key === '-') {
         key = target.length
       }
-      target.splice(+key, 1)
+      key = +key
+      if (key !== key) { return false }
+      target.splice(key, count)
+    } else if (target instanceof String) {
+      if (key === '-') {
+        key = target.length
+      }
+      key = +key
+      if (key !== key) { return false }
+      target = target.slice(0, key) + target.slice(key + count)
+      var parentKey = path[path.length - 2]
+      if (parentKey === undefined) {
+        // The string is the root element.
+        this.content = target
+      } else {
+        var targetParent = this.getPath(path.slice(0, -2))
+        targetParent[parentKey] = target
+      }
     } else {
       delete target[key]
     }
@@ -303,8 +337,8 @@ JsonSync.prototype = {
     }
 
     if (!this.localAdd(path, cloneValue(target))) { return false }
-    if (!this.localRemove(fromPath)) {
-      this.localRemove(path)
+    if (!this.localRemove(fromPath, 1)) {
+      this.localRemove(path, 1)
       return false
     }
     return true
@@ -415,7 +449,7 @@ JsonSync.prototype = {
           op.original = cloneValue(op)
           op.was = cloneValue(this.get(path))
         }
-        this.localRemove(path)
+        this.localRemove(path, 1)
       } else if (op.op === 'move') {
         if (typeof op.from === 'string') {
           var fromPath = pathFromJsonPointer(op.from)
