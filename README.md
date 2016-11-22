@@ -33,10 +33,11 @@ right away!
 
 ## API
 
-- `.add(path, value)`
-- `.remove(path)`
-- `.replace(path, value)`
-- `.move(fromPath, toPath)`
+- `.add(path, value)` on objects, lists and strings.
+- `.remove(path, optional count)` on objects, lists and strings.
+  `count` is only meaningful for strings.
+- `.replace(path, value)` on objects and lists.
+- `.move(fromPath, toPath)` on objects and lists.
 
 To perform an atomic compound operation (ie, a sequence of operations that must
 happen in that order with no concurrent operation inserted within them):
@@ -82,7 +83,6 @@ non-intention-preserving, requiring manual verification.)
 - `mark`: a list of integers providing a unique timestamp.
 - `was`: stores the old value of a destructive operation. It allows performing
   undo without having to recompute everything from the beginning.
-- `count`: integer; remove that number of items (for lists, strings).
 - string add and remove: allows string editing.
 - `arithmetic`: (planned) supports performing operations on numbers. For
   instance, `{op: "arithmetic", path: "/score", value: "max(2*x^2, y)",

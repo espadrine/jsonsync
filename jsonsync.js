@@ -221,11 +221,11 @@ JsonSync.prototype = {
   // {op:'remove', path, was}
   remove: function(pointer, count, options) {
     if (count === undefined) {
-      count = 0
+      count = 1
     } else if (count !== undefined) {
       if (typeof count === 'object') {
         options = count
-        count = 0
+        count = 1
       } else if (typeof count !== 'number') { return
       } else { count = +count }
     }
@@ -237,7 +237,17 @@ JsonSync.prototype = {
     } else {
       var path = pathFromJsonPointer(pointer)
     }
-    var oldValue = cloneValue(this.get(path))
+
+    // If this is string edition, we fetch the old value within the string.
+    var parentValue = (path.length > 0)? this.get(path.slice(0, -1)): null
+    var parent = Object(parentValue)
+    if ((parentValue !== null) && (parent instanceof String)) {
+      var start = +path[path.length - 1]
+      if (start !== start) { return }
+      var oldValue = parentValue.slice(start, start + count)
+    } else {
+      var oldValue = cloneValue(this.get(path))
+    }
 
     // Perform the change locally.
     if (!this.localRemove(path, count)) { return }
@@ -255,7 +265,8 @@ JsonSync.prototype = {
   // path: list of keys.
   // count: number of items to delete.
   localRemove: function(path, count) {
-    if (!(count >= 0)) { return false }
+    // If count isn't a number or isn't positive, this is invalid.
+    if (!(count > 0)) { return false }
     if (path.length === 0) {
       this.content = null
       return true
@@ -272,7 +283,7 @@ JsonSync.prototype = {
       }
       key = +key
       if (key !== key) { return false }
-      target.splice(key, count)
+      target.splice(key, 1)
     } else if (target instanceof String) {
       if (key === '-') {
         key = target.length
@@ -448,8 +459,13 @@ JsonSync.prototype = {
         if (op.was !== undefined) {
           op.original = cloneValue(op)
           op.was = cloneValue(this.get(path))
+          if (Object(op.was) instanceof String) {
+            var count = op.was.length
+          } else {
+            var count = 1
+          }
         }
-        this.localRemove(path, 1)
+        this.localRemove(path, count)
       } else if (op.op === 'move') {
         if (typeof op.from === 'string') {
           var fromPath = pathFromJsonPointer(op.from)
