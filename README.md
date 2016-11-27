@@ -102,3 +102,9 @@ non-intention-preserving, requiring manual verification.)
    Finally, they must never overwrite a value.
 
 [rfc6902 move]: https://tools.ietf.org/html/rfc6902#section-4.4
+
+## TODO
+
+- Make compound operations behave like atomic transactions: either all of them
+  are applied or none.
+- Rebase indices (for strings first, and for lists).
