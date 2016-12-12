@@ -402,14 +402,14 @@ JsonSync.prototype = {
     var changes = []
 
     // We need to find the oldest point to which we must rollback.
-    var rollbackPoint = 0
-    var op = diff[0]
-    for (var j = this.history.length; j > 0; j--) {
-      if (lessThanMark(this.history[j - 1].mark, op.mark) < 0) {
-        rollbackPoint = j
-        break
-      }
+    var rollbackPoint = this.findAtOrAfter(diff[0].mark)
+    // If this is a compound operation, we need to go to the start of it.
+    var op = this.history[rollbackPoint]
+    while (op !== undefined && op.mark[op.mark.length - 1] > 0) {
+      rollbackPoint--
+      op = this.history[rollbackPoint]
     }
+
     changes = this.history.slice(rollbackPoint).reverse().map(invertOperation)
 
     var previousInsertionPoint = rollbackPoint
@@ -440,6 +440,15 @@ JsonSync.prototype = {
     // Perform the changes locally.
     this.localPatch(changes)
     return changes
+  },
+  // Locate the index in history of the earliest change whose mark is ≥ mark.
+  // If there are no such change, produce the length of the history.
+  findAtOrAfter: function(mark) {
+    for (var i = this.history.length - 1; i >= 0; i--) {
+      var op = this.history[i]
+      if (lessThanMark(op.mark, mark) < 0) { break }
+    }
+    return i + 1
   },
 
   // Perform changes to the local JSON object.
