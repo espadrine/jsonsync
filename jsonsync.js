@@ -420,7 +420,16 @@ JsonSync.prototype = {
       var insertionPoint = this.history.length
       for (var j = previousInsertionPoint, histLen = this.history.length;
           j < histLen; j++) {
-        if (lessThanMark(op.mark, this.history[j].mark) < 0) {
+        var compared = lessThanMark(op.mark, this.history[j].mark)
+        if (compared === 0) {
+          if (lessThanMark(op.mark.slice(1, -1), this.machine) === 0) {
+            // We are merging something that we already built into history.
+            throw new Error("We created a new operation with the same " +
+              "identifier as an operation we created previously")
+          }
+          continue  // Ignore already merged foreign operations.
+        }
+        if (compared < 0) {
           insertionPoint = j
           break
         }
