@@ -168,12 +168,6 @@ JsonSync.prototype = {
     }
     var oldValue = cloneValue(this.get(path))
 
-    // Here, a JSON Patch replace must be replacing an existing key.
-    // If the key does not exist, it is an add.
-    if ((oldValue === undefined) && !(Object(parentValue) instanceof Array)) {
-      return this.add(pointer, value)
-    }
-
     // Perform the change locally.
     if (!this.localReplace(path, value)) { return }
 
@@ -462,17 +456,18 @@ JsonSync.prototype = {
 
   // Perform changes to the local JSON object.
   // changes: list of operations.
-  localPatch: function(changes) {
+  localPatch: function(changes, ignoreFailedTransactions) {
     for (var i = 0, changesLen = changes.length; i < changesLen; i++) {
       var op = changes[i]
       var path = op.path
       if (typeof path === 'string') {
         path = pathFromJsonPointer(path)
       }
+      var wasApplied = false;
       if (op.op === 'add') {
-        this.localAdd(path, op.value)
+        wasApplied = this.localAdd(path, op.value)
       } else if (op.op === 'replace') {
-        this.localReplace(path, op.value)
+        wasApplied = this.localReplace(path, op.value)
       } else if (op.op === 'remove') {
         if (op.was !== undefined) {
           op.original = cloneValue(op)
@@ -483,12 +478,45 @@ JsonSync.prototype = {
             var count = 1
           }
         }
-        this.localRemove(path, count)
+        wasApplied = this.localRemove(path, count)
       } else if (op.op === 'move') {
         if (typeof op.from === 'string') {
           var fromPath = pathFromJsonPointer(op.from)
         }
-        this.localMove(fromPath, path)
+        wasApplied = this.localMove(fromPath, path)
+      }
+
+      if (!wasApplied && !ignoreFailedTransactions) {
+        var mark = op.mark[op.mark.length - 1]
+        if (mark > 0) {
+          var inverted = op.inverted
+          // If inverted, the transaction looks like 4 3 2 (← op) 1 0.
+          // Since we go backwards, the mark is incremented every time.
+          var markDelta = inverted ? 1 : -1
+          for (var j = i - 1; j > 0; j--) {
+            op = changes[j]
+            if (mark + markDelta === op.mark[op.mark.length - 1] &&
+                op.inverted === inverted) {
+              mark += markDelta
+            } else { break }
+          }
+          j++
+          // Part of the transaction already applied.
+          var transactionStart = changes.slice(j, i)
+          this.localPatch(transactionStart.reverse().map(invertOperation), true)
+          // Reset those values.
+          op = changes[i]
+          mark = op.mark[op.mark.length - 1]
+        }
+        // This time, we go forward.
+        var markDelta = op.inverted ? -1 : 1
+        for (i++; i < changesLen; i++) {
+          op = changes[i]
+          if (mark + markDelta === op.mark[op.mark.length - 1]) {
+            mark += markDelta
+          } else { break }
+        }
+        i--  // Counterbalance the for loop's i++.
       }
     }
   },
@@ -549,13 +577,13 @@ JsonSync.prototype = {
 // Returns undefined if it cannot.
 var invertOperation = function(op) {
   if (op.op === 'add') {
-    return { op: 'remove', path: op.path, was: op.value }
+    return { op: 'remove', path: op.path, was: op.value, inverted: !op.inverted }
   } else if (op.op === 'remove') {
-    return { op: 'add', path: op.path, value: op.was }
+    return { op: 'add', path: op.path, value: op.was, inverted: !op.inverted }
   } else if (op.op === 'replace') {
-    return { op: 'replace', path: op.path, value: op.was, was: op.value }
+    return { op: 'replace', path: op.path, value: op.was, was: op.value, inverted: !op.inverted }
   } else if (op.op === 'move') {
-    return { op: 'move', from: op.path, path: op.from }
+    return { op: 'move', from: op.path, path: op.from, inverted: !op.inverted }
   }
 }
 

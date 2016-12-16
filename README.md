@@ -38,9 +38,13 @@ right away!
   `count` is only meaningful for strings.
 - `.replace(path, value)` on objects and lists.
 - `.move(fromPath, toPath)` on objects and lists.
+- `data.on('update', function callback(changes))`: runs the callback every time
+  a foreign change in the data occurs. `changes` is a [JSON Patch][].
 
-To perform an atomic compound operation (ie, a sequence of operations that must
-happen in that order with no concurrent operation inserted within them):
+To perform an atomic compound transaction, ie. a sequence of operations that:
+
+1. must happen in that order with no concurrent operation inserted within them,
+2. must not partially apply; all operations must modify the data as intended:
 
 ```js
 var value = data.get(origin)

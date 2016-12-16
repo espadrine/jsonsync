@@ -135,11 +135,27 @@ node[1].replace('/hello', 'there')
 networks.flush(1, 0)
 node[0].replace('/hello', 'after', {after: op})
 assert.equal(node[0].content.hello, 'there',
-  "Atomic compound operations don't allow concurrent operations within them")
+  "Atomic compound transactions don't allow concurrent operations within them")
 
 ;({network, networks, node} = setup(2, {}))
 var op = node[0].add('/hello', 'world')
 node[0].replace('/hello', 'one', {after: op})
 assert.throws(function() {
   node[0].replace('/hello', 'two', {after: op})
-}, "Atomic compound operations must not allow duplicate identities")
+}, "Atomic compound transactions must not allow duplicate identities")
+
+;({network, networks, node} = setup(2, {}))
+node[0].add('/hello', {})
+networks.flush(0, 1)
+node[0].remove('/hello')
+node[1].add('/independent', ['prior operation'])
+var op = node[1].add('/hola', 'mundo')
+node[1].add('/hello/my', 'dear', {after: op})
+node[1].add('/independent/-', 'posterior operation')
+networks.flush(0, 1)
+assert.equal(node[1].content.hola, undefined,
+  "Atomic compound transactions must not partially apply")
+assert.equal(node[1].content.independent[0], 'prior operation',
+  "Unapplied atomic compound transactions must not block prior operations")
+assert.equal(node[1].content.independent[1], 'posterior operation',
+  "Unapplied atomic compound transactions must not block posterior operations")
