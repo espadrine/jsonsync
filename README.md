@@ -109,6 +109,4 @@ non-intention-preserving, requiring manual verification.)
 
 ## TODO
 
-- Make compound operations behave like atomic transactions: either all of them
-  are applied or none.
 - Rebase indices (for strings first, and for lists).

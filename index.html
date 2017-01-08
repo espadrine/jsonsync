@@ -44,14 +44,17 @@ var jsonEditor = function(dom, jsonsync) {
     json = jsonsync.content
     showJson(json)
   }
+  var escapeJsonPath = function(key) {
+    return key.replace(/~/g, '~0').replace(/\//g, '~1')
+  }
   var insertValueToObject = function(event) {
     var path = event.target.dataset.path
-    var key = prompt("Enter a JSON key wherein to insert a value.")
+    var key = prompt("Enter a key wherein to insert a value.")
     var value = prompt("Enter a JSON value to insert.")
     try {
       value = JSON.parse(value)
     } catch(e) { alert(e); return }
-    jsonsync.add(path + '/' + key, value)
+    jsonsync.add(path + '/' + escapeJsonPath(key), value)
     json = jsonsync.content
     showJson(json)
   }
