@@ -39,7 +39,8 @@ right away!
 - `.replace(path, value)` on objects and lists.
 - `.move(fromPath, toPath)` on objects and lists.
 - `data.on('update', function callback(changes))`: runs the callback every time
-  a foreign change in the data occurs. `changes` is a [JSON Patch][].
+  a foreign change in the data occurs. `changes` is a [JSON Patch][], with lists
+  of string keys / indices instead of JSON Pointers.
 
 To perform an atomic compound transaction, ie. a sequence of operations that:
 
@@ -110,3 +111,4 @@ non-intention-preserving, requiring manual verification.)
 ## TODO
 
 - Rebase indices (for strings first, and for lists).
+- Implement copy.

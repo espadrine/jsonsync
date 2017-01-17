@@ -76,14 +76,11 @@ JsonSync.prototype = {
   // localPatch and invertOperation.
 
   // {op:'add', path, was}
-  add: function(pointer, value, options) {
+  add: function(path, value, options) {
     options = options || {}
-    // Ensure that this is a JSON Pointer, even if given a list.
-    if (typeof pointer !== 'string') {
-      var path = pointer
-      pointer = jsonPointerFromPath(path)
-    } else {
-      var path = pathFromJsonPointer(pointer)
+    // Ensure that this is a list of keys, even if given a JSON Pointer.
+    if (typeof path === 'string') {
+      path = pathFromJsonPointer(path)
     }
     var oldValue = cloneValue(this.get(path))
 
@@ -93,14 +90,14 @@ JsonSync.prototype = {
     var parent = Object(parentValue)
     if ((oldValue !== undefined) && (parentValue !== null) &&
         !(parent instanceof Array)) {
-      return this.replace(pointer, value)
+      return this.replace(path, value)
     }
 
     // Perform the change locally.
     if (!this.localAdd(path, value)) { return }
 
     // Transmit the change.
-    var op = { op: 'add', path: pointer, value: value }
+    var op = { op: 'add', path: path, value: value }
     this.insertOpInHistory(op, options)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
@@ -157,14 +154,11 @@ JsonSync.prototype = {
   },
 
   // {op:'replace', path, value, was}
-  replace: function(pointer, value, options) {
+  replace: function(path, value, options) {
     options = options || {}
-    // Ensure that this is a JSON Pointer, even if given a list.
-    if (typeof pointer !== 'string') {
-      var path = pointer
-      pointer = jsonPointerFromPath(path)
-    } else {
-      var path = pathFromJsonPointer(pointer)
+    // Ensure that this is a list of keys, even if given a JSON Pointer.
+    if (typeof path === 'string') {
+      path = pathFromJsonPointer(path)
     }
     var oldValue = cloneValue(this.get(path))
 
@@ -172,7 +166,7 @@ JsonSync.prototype = {
     if (!this.localReplace(path, value)) { return }
 
     // Transmit the change.
-    var op = { op: 'replace', path: pointer, value: value, was: oldValue }
+    var op = { op: 'replace', path: path, value: value, was: oldValue }
     this.insertOpInHistory(op, options)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
@@ -213,7 +207,7 @@ JsonSync.prototype = {
   },
 
   // {op:'remove', path, was}
-  remove: function(pointer, count, options) {
+  remove: function(path, count, options) {
     if (count === undefined) {
       count = 1
     } else if (count !== undefined) {
@@ -224,12 +218,9 @@ JsonSync.prototype = {
       } else { count = +count }
     }
     options = options || {}
-    // Ensure that this is a JSON Pointer, even if given a list.
-    if (typeof pointer !== 'string') {
-      var path = pointer
-      pointer = jsonPointerFromPath(path)
-    } else {
-      var path = pathFromJsonPointer(pointer)
+    // Ensure that this is a list of keys, even if given a JSON Pointer.
+    if (typeof path === 'string') {
+      path = pathFromJsonPointer(path)
     }
 
     // If this is string edition, we fetch the old value within the string.
@@ -247,7 +238,7 @@ JsonSync.prototype = {
     if (!this.localRemove(path, count)) { return }
 
     // Transmit the change.
-    var op = { op: 'remove', path: pointer }
+    var op = { op: 'remove', path: path }
     if (oldValue !== undefined) { op.was = oldValue }
     this.insertOpInHistory(op, options)
     this.broadcast(this.protoDiff([op]))
@@ -301,20 +292,14 @@ JsonSync.prototype = {
   },
 
   // {op:'move', from, path}
-  move: function(fromPointer, pointer, options) {
+  move: function(fromPath, path, options) {
     options = options || {}
-    // Ensure that this is a JSON Pointer, even if given a list.
-    if (typeof fromPointer !== 'string') {
-      var fromPath = fromPointer
-      fromPointer = jsonPointerFromPath(path)
-    } else {
-      var fromPath = pathFromJsonPointer(fromPointer)
+    // Ensure that this is a list of keys, even if given a JSON Pointer.
+    if (typeof fromPath === 'string') {
+      fromPath = pathFromJsonPointer(fromPath)
     }
-    if (typeof pointer !== 'string') {
-      var path = pointer
-      pointer = jsonPointerFromPath(path)
-    } else {
-      var path = pathFromJsonPointer(pointer)
+    if (typeof path === 'string') {
+      path = pathFromJsonPointer(path)
     }
     // FIXME: when we have compound operations, convert an overriding move to a
     // remove followed by a move.
@@ -322,7 +307,7 @@ JsonSync.prototype = {
     if (!this.localMove(fromPath, path)) { return }
 
     // Transmit the change.
-    var op = { op: 'move', from: fromPointer, path: pointer }
+    var op = { op: 'move', from: fromPath, path: path }
     this.insertOpInHistory(op, options)
     this.broadcast(this.protoDiff([op]))
     this.emit('localUpdate', [op])
@@ -350,13 +335,11 @@ JsonSync.prototype = {
   },
 
   // Give the JSON object corresponding to that JSON Pointer (or path).
-  get: function(pointer) {
-    // Ensure that this is a JSON Pointer, even if given a list.
-    if (typeof pointer !== 'string') {
-      var path = pointer
-      pointer = jsonPointerFromPath(path)
-    } else {
-      var path = pathFromJsonPointer(pointer)
+  get: function(path) {
+    var oldpath = path
+    // Ensure that this is a list of keys, even if given a JSON Pointer.
+    if (typeof path === 'string') {
+      path = pathFromJsonPointer(path)
     }
     return this.getPath(path)
   },
@@ -482,7 +465,7 @@ JsonSync.prototype = {
       } else if (op.op === 'move') {
         if (typeof op.from === 'string') {
           var fromPath = pathFromJsonPointer(op.from)
-        }
+        } else { var fromPath = op.from }
         wasApplied = this.localMove(fromPath, path)
       }
 
@@ -541,6 +524,7 @@ JsonSync.prototype = {
     }
   },
   // diff: list of operations.
+  // FIXME: compactify representation.
   protoDiff: function(diff) {
     return JSON.stringify([1, diff])
   },
