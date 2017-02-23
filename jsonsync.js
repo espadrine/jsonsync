@@ -651,6 +651,12 @@ function lessThanMark(mark1, mark2) {
 }
 
 // Random 128-bit represented as a list of numbers.
+// Collision probability: below 0.5 for n < 2^64 = 18446744073709551616.
+// To approximate for other probabilities:
+// p = function(n, max) { return 1 - fact(max) / (Math.pow(max, n) * fact(max - n)); }
+// Tailor expansion: p = function(n, max) { return 1 - Math.exp(-n*(n-1)/(max*2)); }
+// Use n^2 instead of n*(n-1) and find n in terms of probability p:
+// n = function(p, max) { return Math.sqrt(max * 2 * Math.log(1 / (1 - p))); }
 var rand128 = function() {
   if (nodejs) {
     var randomBytes = require('crypto').randomBytes
